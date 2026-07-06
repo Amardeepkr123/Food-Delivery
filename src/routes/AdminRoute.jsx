@@ -14,7 +14,10 @@ const AdminRoute = () => {
     return <Navigate to="/login" replace />;
   }
 
-  if (user?.role !== 'admin') {
+  // Check if user has admin role - support both role and isAdmin flags
+  const isAdminUser = user?.role === 'admin' || user?.isAdmin === true;
+  
+  if (!isAdminUser) {
     return <Navigate to="/" replace />;
   }
 

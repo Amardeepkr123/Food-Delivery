@@ -46,13 +46,32 @@ export const AuthProvider = ({ children }) => {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const user = { 
-        id: 1, 
-        name: 'John Doe', 
-        email,
-        role: 'customer'
-      };
-      const token = 'mock-jwt-token';
+      let user = null;
+      let token = 'mock-jwt-token';
+      
+      // Check for admin credentials (case-insensitive)
+      if (email.toLowerCase() === 'admin@fooddelivery.com' && password === 'admin123') {
+        // Admin user
+        user = { 
+          id: 0, 
+          name: 'Admin User', 
+          email: email,
+          role: 'admin',
+          isAdmin: true,
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'
+        };
+        toast.success('Welcome Admin! 🎉');
+      } else {
+        // Regular user
+        user = { 
+          id: 1, 
+          name: email.split('@')[0] || 'User', 
+          email: email,
+          role: 'customer',
+          isAdmin: false
+        };
+        toast.success('Welcome back! 🎉');
+      }
       
       storage.set('token', token);
       storage.set('user', user);
@@ -64,8 +83,7 @@ export const AuthProvider = ({ children }) => {
       
       authService.setAuthToken(token);
       setUser(user);
-      toast.success('Welcome back! 🎉');
-      return { success: true };
+      return { success: true, user };
     } catch (err) {
       const message = err.message || 'Login failed';
       setError(message);
@@ -84,11 +102,12 @@ export const AuthProvider = ({ children }) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const user = { 
-        id: 1, 
-        name: userData.fullName || userData.name, 
+        id: Date.now(), 
+        name: userData.fullName || userData.name || 'User', 
         email: userData.email,
         phone: userData.phone || '',
-        role: 'customer'
+        role: 'customer',
+        isAdmin: false
       };
       const token = 'mock-jwt-token';
       
@@ -100,6 +119,38 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (err) {
       const message = err.message || 'Registration failed';
+      setError(message);
+      toast.error(message);
+      return { success: false, message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const googleAuth = async (credential) => {
+    setError(null);
+    setLoading(true);
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const user = { 
+        id: 2, 
+        name: 'Google User', 
+        email: 'google@example.com',
+        role: 'customer',
+        isAdmin: false
+      };
+      const token = 'mock-google-token';
+      
+      storage.set('token', token);
+      storage.set('user', user);
+      authService.setAuthToken(token);
+      setUser(user);
+      toast.success('Google login successful! 🎉');
+      return { success: true };
+    } catch (err) {
+      const message = err.message || 'Google login failed';
       setError(message);
       toast.error(message);
       return { success: false, message };
@@ -125,6 +176,7 @@ export const AuthProvider = ({ children }) => {
     error,
     login,
     register,
+    googleAuth,
     logout,
     isAuthenticated: !!user && !!storage.get('token'),
   };

@@ -16,7 +16,9 @@ import {
   FiLogOut,
   FiSettings,
   FiHeart,
-  FiClock
+  FiClock,
+  FiShield,
+  FiUsers  // Added this import
 } from 'react-icons/fi';
 import { FaUtensils } from 'react-icons/fa';
 
@@ -38,6 +40,9 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
+
   const navLinks = [
     { path: '/', label: 'Home', icon: FiHome },
     { path: '/restaurants', label: 'Restaurants', icon: FaUtensils },
@@ -53,9 +58,8 @@ const Navbar = () => {
 
   const getRoleBasedLink = () => {
     if (!user) return '/login';
+    if (isAdmin) return '/admin/dashboard';
     switch (user.role) {
-      case 'admin':
-        return '/admin/dashboard';
       case 'restaurant_owner':
         return '/restaurant-owner/dashboard';
       case 'delivery_partner':
@@ -161,8 +165,22 @@ const Navbar = () => {
                       className="absolute right-0 mt-2 w-64 glass-card rounded-2xl overflow-hidden shadow-2xl"
                     >
                       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                        <p className="font-semibold text-gray-800 dark:text-white">{user?.name}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{user?.email}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full food-gradient-bg flex items-center justify-center text-white font-bold text-sm">
+                            {user?.name?.charAt(0) || 'U'}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-800 dark:text-white">{user?.name}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{user?.email}</p>
+                          </div>
+                          {/* Admin Badge */}
+                          {isAdmin && (
+                            <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-red-500 text-white text-[10px] font-bold shadow-lg flex items-center gap-1">
+                              <FiShield className="w-3 h-3" />
+                              Admin
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="p-2">
                         <Link
@@ -181,6 +199,26 @@ const Navbar = () => {
                           <FiSettings className="text-sm" />
                           <span>Dashboard</span>
                         </Link>
+                        {isAdmin && (
+                          <>
+                            <Link
+                              to="/admin/users"
+                              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300"
+                              onClick={() => setIsProfileOpen(false)}
+                            >
+                              <FiUsers className="text-sm" />
+                              <span>Manage Users</span>
+                            </Link>
+                            <Link
+                              to="/admin/restaurants"
+                              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300"
+                              onClick={() => setIsProfileOpen(false)}
+                            >
+                              <FaUtensils className="text-sm" />
+                              <span>Manage Restaurants</span>
+                            </Link>
+                          </>
+                        )}
                         <Link
                           to="/orders"
                           className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300"
@@ -260,6 +298,16 @@ const Navbar = () => {
                     <span>{link.label}</span>
                   </Link>
                 ))}
+                {isAuthenticated && isAdmin && (
+                  <Link
+                    to="/admin/dashboard"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <FiShield className="text-sm" />
+                    <span>Admin Dashboard</span>
+                  </Link>
+                )}
                 {!isAuthenticated && (
                   <Link
                     to="/login"

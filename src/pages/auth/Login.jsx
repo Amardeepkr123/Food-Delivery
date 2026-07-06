@@ -3,49 +3,68 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
-import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight } from 'react-icons/fi';
+import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight, FiShield } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import { validateEmail } from '../../utils/validation';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading } = useAuth();
+  const { login, isAuthenticated, loading, user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isAdminLogin, setIsAdminLogin] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     setValue,
+    watch,
   } = useForm();
 
+  const email = watch('email');
+
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
+    if (isAuthenticated && user) {
+      // Check if user is admin
+      if (user.role === 'admin' || user.isAdmin === true) {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/');
+      }
     }
     
+    // Check for remembered email
     const remembered = localStorage.getItem('rememberMe');
     if (remembered) {
-      const email = localStorage.getItem('rememberedEmail');
-      if (email) {
-        setValue('email', email);
+      const rememberedEmail = localStorage.getItem('rememberedEmail');
+      if (rememberedEmail) {
+        setValue('email', rememberedEmail);
         setValue('rememberMe', true);
       }
     }
-  }, [isAuthenticated, navigate, setValue]);
+  }, [isAuthenticated, user, navigate, setValue]);
 
   const onSubmit = async (data) => {
     setError('');
     setIsLoading(true);
+    setShowSuccess(false);
     
     try {
       const result = await login(data.email, data.password, data.rememberMe);
       if (result.success) {
         setShowSuccess(true);
-        setTimeout(() => navigate('/'), 1000);
+        // Check if user is admin
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        setTimeout(() => {
+          if (storedUser.role === 'admin' || storedUser.isAdmin === true) {
+            navigate('/admin/dashboard');
+          } else {
+            navigate('/');
+          }
+        }, 1000);
       } else {
         setError(result.message || 'Login failed. Please try again.');
       }
@@ -54,6 +73,16 @@ const Login = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAdminLogin = () => {
+    setValue('email', 'admin@fooddelivery.com');
+    setValue('password', 'admin123');
+    setIsAdminLogin(true);
+    // Auto submit after setting values
+    setTimeout(() => {
+      handleSubmit(onSubmit)();
+    }, 300);
   };
 
   return (
@@ -194,6 +223,59 @@ const Login = () => {
             <p style={{ color: '#dc2626', fontSize: '14px' }}>{error}</p>
           </motion.div>
         )}
+
+        {/* Admin Login Button */}
+        <div style={{ marginBottom: '16px' }}>
+          <button
+            onClick={handleAdminLogin}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #fef3c7, #fed7aa)',
+              border: '2px solid #f59e0b',
+              color: '#92400e',
+              fontWeight: '600',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'scale(1.02)';
+              e.target.style.boxShadow = '0 4px 12px rgba(245,158,11,0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'scale(1)';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            <FiShield size={20} style={{ color: '#d97706' }} />
+            <span>Login as Admin (Demo)</span>
+          </button>
+          {isAdminLogin && (
+            <p style={{
+              fontSize: '12px',
+              color: '#16a34a',
+              marginTop: '8px',
+              textAlign: 'center',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }}>
+              ✓ Admin credentials loaded. Click Sign In to continue.
+            </p>
+          )}
+          <p style={{
+            fontSize: '11px',
+            color: '#9ca3af',
+            marginTop: '4px',
+            textAlign: 'center'
+          }}>
+            Email: admin@fooddelivery.com | Password: admin123
+          </p>
+        </div>
 
         {/* Login Form */}
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -401,8 +483,10 @@ const Login = () => {
               opacity: (isLoading || loading) ? 0.5 : 1
             }}
             onMouseEnter={(e) => {
-              e.target.style.transform = 'scale(1.02)';
-              e.target.style.boxShadow = '0 12px 32px rgba(239,68,68,0.4)';
+              if (!isLoading && !loading) {
+                e.target.style.transform = 'scale(1.02)';
+                e.target.style.boxShadow = '0 12px 32px rgba(239,68,68,0.4)';
+              }
             }}
             onMouseLeave={(e) => {
               e.target.style.transform = 'scale(1)';
@@ -597,9 +681,9 @@ const Login = () => {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
-        @keyframes bounce {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
       `}</style>
     </div>
