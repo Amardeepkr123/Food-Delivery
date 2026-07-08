@@ -1,178 +1,652 @@
-import React, { useState, useEffect } from 'react';
+// src/pages/cart/Cart.jsx
+import React, { useState, forwardRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import { useCartContext } from '../../context/CartContext';
+import { useAuth } from '../../hooks/useAuth';
+import MainLayout from '../../layouts/MainLayout';
+import {
   FiShoppingBag,
   FiTrash2,
   FiPlus,
   FiMinus,
   FiHeart,
   FiClock,
+  FiMapPin,
   FiStar,
   FiTruck,
-  FiShield,
   FiGift,
   FiTag,
-  FiPercent,
+  FiCreditCard,
+  FiSmartphone,
+  FiDollarSign,
   FiArrowLeft,
   FiArrowRight,
-  FiDollarSign,
-  FiCheckCircle,
-  FiXCircle,
+  FiX,
+  FiCheck,
+  FiEdit2,
+  FiHome,
+  FiBriefcase,
+  FiMap,
+  FiInfo,
   FiAlertCircle,
-  FiRefreshCw,
-  FiCreditCard,
-  FiMapPin,
-  FiPackage,
-  FiTruck as FiTruckIcon,
+  FiCoffee,
+  FiZap,
   FiAward,
-  FiTrendingUp
+  FiTrendingUp,
+  FiShoppingCart,
+  FiLoader,
+  FiPackage,
+  FiSend,
 } from 'react-icons/fi';
-import { 
-  FaUtensils, 
-  FaPizzaSlice, 
-  FaHamburger, 
-  FaIceCream, 
-  FaCoffee,
-  FaLeaf,
-  FaPepperHot,
-  FaFish,
-  FaBirthdayCake
-} from 'react-icons/fa';
-import MainLayout from '../../layouts/MainLayout';
-import { useAuth } from '../../hooks/useAuth';
-import { useCart } from '../../hooks/useCart';
+import { FaLeaf, FaUtensils } from 'react-icons/fa';
 
-const Cart = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { 
-    cartItems, 
-    itemCount, 
-    totalAmount, 
-    removeFromCart, 
-    updateQuantity, 
-    clearCart,
-    getSubtotal,
-    getTotal
-  } = useCart();
+// ============================================
+// MOCK DATA (for demo)
+// ============================================
+const mockCartItems = [
+  {
+    id: 1,
+    name: 'Margherita Pizza',
+    category: 'Pizza',
+    description: 'Fresh tomato sauce, mozzarella, basil, olive oil',
+    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400',
+    price: 16.99,
+    originalPrice: 19.99,
+    quantity: 2,
+    isVeg: true,
+    isAvailable: true,
+    discount: 15,
+    customizations: {
+      extraCheese: false,
+      extraSauce: false,
+      extraToppings: false,
+      spiceLevel: 2,
+    },
+    specialInstructions: 'Extra cheese please',
+  },
+  {
+    id: 2,
+    name: 'Pepperoni Pizza',
+    category: 'Pizza',
+    description: 'Tomato sauce, mozzarella, pepperoni, oregano',
+    image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400',
+    price: 19.99,
+    originalPrice: 22.99,
+    quantity: 1,
+    isVeg: false,
+    isAvailable: true,
+    discount: 10,
+    customizations: {
+      extraCheese: true,
+      extraSauce: false,
+      extraToppings: true,
+      spiceLevel: 3,
+    },
+    specialInstructions: '',
+  },
+  {
+    id: 3,
+    name: 'Garlic Bread',
+    category: 'Snacks',
+    description: 'Fresh bread with garlic butter, parsley, and cheese',
+    image: 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=400',
+    price: 4.99,
+    originalPrice: 6.99,
+    quantity: 3,
+    isVeg: true,
+    isAvailable: true,
+    discount: 0,
+    customizations: {
+      extraCheese: false,
+      extraSauce: false,
+      extraToppings: false,
+      spiceLevel: 1,
+    },
+    specialInstructions: '',
+  },
+];
 
-  const [loading, setLoading] = useState(false);
+const mockRecommendedFoods = [
+  { id: 4, name: 'Pasta Alfredo', price: 18.99, rating: 4.6, image: 'https://images.unsplash.com/photo-1645112411342-4665a10a3a1d?w=200', isVeg: true },
+  { id: 5, name: 'Caesar Salad', price: 14.99, rating: 4.5, image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=200', isVeg: true },
+  { id: 6, name: 'Tiramisu', price: 8.99, rating: 4.9, image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=200', isVeg: true },
+];
+
+const mockCoupons = [
+  { code: 'FIRST20', description: '20% off on first order', discount: 20, minOrder: 50 },
+  { code: 'FREEDEL', description: 'Free delivery on orders above ₹300', discount: 0, minOrder: 30 },
+  { code: 'SAVE50', description: '₹50 off on orders above ₹200', discount: 50, minOrder: 20 },
+];
+
+const mockAddresses = [
+  { id: 1, type: 'Home', address: '123, Marine Drive, Mumbai - 400001', isDefault: true },
+  { id: 2, type: 'Office', address: '456, Connaught Place, Delhi - 110001', isDefault: false },
+];
+
+// ============================================
+// CART ITEM COMPONENT - WITH FORWARD REF
+// ============================================
+const CartItem = forwardRef(({ 
+  item, 
+  onUpdateQuantity, 
+  onRemove, 
+  onSaveForLater, 
+  onFavorite 
+}, ref) => {
+  const [showCustomizations, setShowCustomizations] = useState(false);
+  const [instructions, setInstructions] = useState(item.specialInstructions || '');
+
+  return (
+    <motion.div
+      ref={ref}
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -100 }}
+      className="glass-card rounded-2xl p-4 md:p-6 hover:shadow-2xl transition-all duration-300"
+    >
+      <div className="flex flex-col md:flex-row gap-4">
+        {/* Image */}
+        <div className="relative md:w-32 h-32 flex-shrink-0 rounded-xl overflow-hidden">
+          <img
+            src={item.image}
+            alt={item.name}
+            className="w-full h-full object-cover"
+          />
+          {item.discount > 0 && (
+            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs font-bold">
+              {item.discount}% OFF
+            </div>
+          )}
+          {!item.isAvailable && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+              <span className="text-white text-sm font-semibold">Unavailable</span>
+            </div>
+          )}
+        </div>
+
+        {/* Details */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                {item.isVeg ? (
+                  <span className="text-green-500 text-sm flex items-center gap-1">
+                    <FaLeaf /> Veg
+                  </span>
+                ) : (
+                  <span className="text-red-500 text-sm flex items-center gap-1">
+                    <FaUtensils /> Non-Veg
+                  </span>
+                )}
+                <span className="text-xs text-gray-400">{item.category}</span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white truncate">
+                {item.name}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                {item.description}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                {item.originalPrice > item.price && (
+                  <p className="text-sm text-gray-400 line-through">${item.originalPrice}</p>
+                )}
+                <p className="text-xl font-bold text-orange-500">${item.price}</p>
+              </div>
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                <button
+                  onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  disabled={item.quantity <= 1}
+                >
+                  <FiMinus className="w-4 h-4" />
+                </button>
+                <span className="w-8 text-center font-semibold text-gray-800 dark:text-white">
+                  {item.quantity}
+                </span>
+                <button
+                  onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <FiPlus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <button
+              onClick={() => setShowCustomizations(!showCustomizations)}
+              className="text-xs text-gray-500 hover:text-orange-500 transition-colors flex items-center gap-1"
+            >
+              <FiEdit2 className="w-3 h-3" />
+              Customize
+            </button>
+            <button
+              onClick={() => onSaveForLater(item.id)}
+              className="text-xs text-gray-500 hover:text-blue-500 transition-colors flex items-center gap-1"
+            >
+              <FiClock className="w-3 h-3" />
+              Save for later
+            </button>
+            <button
+              onClick={() => onFavorite(item.id)}
+              className="text-xs text-gray-500 hover:text-red-500 transition-colors flex items-center gap-1"
+            >
+              <FiHeart className="w-3 h-3" />
+              Favorite
+            </button>
+            <button
+              onClick={() => onRemove(item.id)}
+              className="text-xs text-red-500 hover:text-red-600 transition-colors flex items-center gap-1 ml-auto"
+            >
+              <FiTrash2 className="w-3 h-3" />
+              Remove
+            </button>
+          </div>
+
+          {/* Customizations */}
+          <AnimatePresence>
+            {showCustomizations && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                  <div className="flex flex-wrap gap-3">
+                    <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300">
+                      <input type="checkbox" className="rounded" />
+                      Extra Cheese
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300">
+                      <input type="checkbox" className="rounded" />
+                      Extra Sauce
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300">
+                      <input type="checkbox" className="rounded" />
+                      Extra Toppings
+                    </label>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600 dark:text-gray-300">Spice Level</label>
+                    <div className="flex gap-2 mt-1">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <button
+                          key={level}
+                          className={`px-3 py-1 rounded-full text-xs transition-all ${
+                            level === item.customizations?.spiceLevel
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600 dark:text-gray-300">Special Instructions</label>
+                    <input
+                      type="text"
+                      value={instructions}
+                      onChange={(e) => setInstructions(e.target.value)}
+                      placeholder="Add cooking instructions..."
+                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all text-sm"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+CartItem.displayName = 'CartItem';
+
+// ============================================
+// BILL SUMMARY COMPONENT
+// ============================================
+const BillSummary = ({ subtotal, discount, couponDiscount, deliveryFee, platformFee, packagingFee, gst, tip, grandTotal }) => {
+  return (
+    <div className="glass-card rounded-2xl p-6 sticky top-4">
+      <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
+        Bill Summary
+      </h3>
+
+      <div className="space-y-3 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
+          <span className="text-gray-800 dark:text-white">${subtotal.toFixed(2)}</span>
+        </div>
+        {discount > 0 && (
+          <div className="flex justify-between text-green-600">
+            <span>Item Discount</span>
+            <span>-${discount.toFixed(2)}</span>
+          </div>
+        )}
+        {couponDiscount > 0 && (
+          <div className="flex justify-between text-green-600">
+            <span>Coupon Discount</span>
+            <span>-${couponDiscount.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span className="text-gray-500 dark:text-gray-400">Delivery Fee</span>
+          <span className="text-gray-800 dark:text-white">${deliveryFee.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500 dark:text-gray-400">Platform Fee</span>
+          <span className="text-gray-800 dark:text-white">${platformFee.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500 dark:text-gray-400">Packaging Charge</span>
+          <span className="text-gray-800 dark:text-white">${packagingFee.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500 dark:text-gray-400">GST (5%)</span>
+          <span className="text-gray-800 dark:text-white">${gst.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500 dark:text-gray-400">Tip</span>
+          <span className="text-gray-800 dark:text-white">${tip.toFixed(2)}</span>
+        </div>
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between font-bold text-lg">
+          <span className="text-gray-800 dark:text-white">Grand Total</span>
+          <span className="text-orange-500">${grandTotal.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// COUPON SECTION COMPONENT
+// ============================================
+const CouponSection = ({ onApplyCoupon, onRemoveCoupon, appliedCoupon }) => {
   const [couponCode, setCouponCode] = useState('');
-  const [couponApplied, setCouponApplied] = useState(false);
-  const [discount, setDiscount] = useState(0);
-  const [couponError, setCouponError] = useState('');
-  const [savedItems, setSavedItems] = useState([]);
-  const [recommendedItems, setRecommendedItems] = useState([]);
+  const [showAvailable, setShowAvailable] = useState(false);
 
-  useEffect(() => {
-    // Load saved items from localStorage
-    const saved = localStorage.getItem('savedItems');
-    if (saved) {
-      setSavedItems(JSON.parse(saved));
-    }
-
-    // Mock recommended items
-    setRecommendedItems([
-      { id: 101, name: 'Garlic Bread', price: 4.99, image: '🍞', restaurant: 'Pizza Palace' },
-      { id: 102, name: 'French Fries', price: 3.99, image: '🍟', restaurant: 'Burger House' },
-      { id: 103, name: 'Miso Soup', price: 5.99, image: '🍜', restaurant: 'Sushi Master' },
-    ]);
-  }, []);
-
-  const subtotal = getSubtotal();
-  const deliveryFee = subtotal > 0 ? (subtotal > 50 ? 0 : 3.99) : 0;
-  const tax = subtotal * 0.08;
-  const total = getTotal();
-
-  const handleApplyCoupon = () => {
-    if (!couponCode.trim()) {
-      setCouponError('Please enter a coupon code');
-      return;
-    }
-
-    // Simulate coupon validation
-    if (couponCode.toUpperCase() === 'SAVE20') {
-      setDiscount(subtotal * 0.2);
-      setCouponApplied(true);
-      setCouponError('');
-    } else if (couponCode.toUpperCase() === 'FIRST10') {
-      setDiscount(subtotal * 0.1);
-      setCouponApplied(true);
-      setCouponError('');
-    } else {
-      setCouponError('Invalid coupon code');
-      setCouponApplied(false);
-      setDiscount(0);
-    }
-  };
-
-  const handleRemoveCoupon = () => {
-    setCouponApplied(false);
-    setDiscount(0);
-    setCouponCode('');
-    setCouponError('');
-  };
-
-  const handleSaveForLater = (item) => {
-    const updatedSaved = [...savedItems, item];
-    setSavedItems(updatedSaved);
-    localStorage.setItem('savedItems', JSON.stringify(updatedSaved));
-    removeFromCart(item.id);
-  };
-
-  const handleMoveToCart = (item) => {
-    const updatedSaved = savedItems.filter(i => i.id !== item.id);
-    setSavedItems(updatedSaved);
-    localStorage.setItem('savedItems', JSON.stringify(updatedSaved));
-    // Add back to cart with quantity 1
-    updateQuantity(item.id, 1);
-  };
-
-  const handleProceedToCheckout = () => {
-    if (cartItems.length === 0) {
-      return;
-    }
-    navigate('/checkout');
-  };
-
-  const handleContinueShopping = () => {
-    navigate('/restaurants');
-  };
-
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.5,
-        staggerChildren: 0.1
+  const handleApply = () => {
+    if (couponCode.trim()) {
+      const found = mockCoupons.find(c => c.code === couponCode.toUpperCase());
+      if (found) {
+        onApplyCoupon(found);
+        setCouponCode('');
+      } else {
+        alert('Invalid coupon code');
       }
     }
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4 }
+  return (
+    <div className="glass-card rounded-2xl p-6">
+      <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+        <FiTag className="text-orange-500" />
+        Apply Coupon
+      </h3>
+
+      {appliedCoupon ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex items-center justify-between p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30"
+        >
+          <div>
+            <p className="font-semibold text-green-600 dark:text-green-400">
+              {appliedCoupon.code}
+            </p>
+            <p className="text-xs text-green-500 dark:text-green-300">{appliedCoupon.description}</p>
+          </div>
+          <button
+            onClick={onRemoveCoupon}
+            className="p-1.5 rounded-lg hover:bg-green-200 dark:hover:bg-green-800/30 transition-colors"
+          >
+            <FiX className="w-4 h-4 text-green-600" />
+          </button>
+        </motion.div>
+      ) : (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Enter coupon code"
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+            className="flex-1 px-4 py-2.5 rounded-xl bg-white/60 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all text-sm"
+          />
+          <button
+            onClick={handleApply}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold hover:shadow-lg hover:shadow-orange-500/30 transition-all"
+          >
+            Apply
+          </button>
+        </div>
+      )}
+
+      <button
+        onClick={() => setShowAvailable(!showAvailable)}
+        className="text-xs text-orange-500 hover:text-orange-600 mt-2"
+      >
+        {showAvailable ? 'Hide available coupons' : 'Show available coupons'}
+      </button>
+
+      <AnimatePresence>
+        {showAvailable && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 space-y-2">
+              {mockCoupons.map((coupon) => (
+                <div key={coupon.code} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-800 dark:text-white">{coupon.code}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{coupon.description}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCouponCode(coupon.code);
+                      handleApply();
+                    }}
+                    className="px-3 py-1 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// ============================================
+// RECOMMENDED FOODS SLIDER
+// ============================================
+const RecommendedFoods = ({ foods, onAdd }) => {
+  return (
+    <div className="mt-8">
+      <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+        <FiTrendingUp className="text-orange-500" />
+        Recommended for You
+      </h3>
+      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+        {foods.map((food) => (
+          <motion.div
+            key={food.id}
+            whileHover={{ y: -4 }}
+            className="glass-card rounded-2xl p-4 min-w-[160px] max-w-[160px] flex-shrink-0"
+          >
+            <img
+              src={food.image}
+              alt={food.name}
+              className="w-full h-24 rounded-xl object-cover"
+            />
+            <h4 className="font-semibold text-gray-800 dark:text-white text-sm mt-2 truncate">
+              {food.name}
+            </h4>
+            <div className="flex items-center gap-1 text-xs text-yellow-500">
+              <FiStar className="fill-current" /> {food.rating}
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <span className="font-bold text-orange-500 text-sm">${food.price}</span>
+              <button
+                onClick={() => onAdd(food)}
+                className="p-1.5 rounded-full bg-gradient-to-r from-orange-500 to-red-500 text-white hover:scale-110 transition-transform"
+              >
+                <FiPlus className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// MAIN CART COMPONENT
+// ============================================
+const Cart = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { 
+    cartItems: contextCartItems,
+    addToCart: contextAddToCart,
+    removeFromCart: contextRemoveFromCart,
+    updateQuantity: contextUpdateQuantity,
+    clearCart: contextClearCart,
+    getSubtotal,
+    getTotal,
+    itemCount: contextItemCount,
+  } = useCartContext();
+
+  // Use mock data if context is empty (for demo)
+  const [cartItems, setCartItems] = useState(mockCartItems);
+  const [loading, setLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [selectedAddress, setSelectedAddress] = useState(mockAddresses[0]);
+  const [tip, setTip] = useState(0);
+  const [isOrderPlacing, setIsOrderPlacing] = useState(false);
+
+  // Use context if available, otherwise use local state
+  const items = contextCartItems?.length > 0 ? contextCartItems : cartItems;
+  const itemCount = contextItemCount || items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Calculate totals
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const itemDiscount = items.reduce((sum, item) => sum + (item.originalPrice - item.price) * item.quantity, 0);
+  const couponDiscount = appliedCoupon ? Math.min(subtotal * (appliedCoupon.discount / 100), 100) : 0;
+  const deliveryFee = subtotal > 30 ? 0 : 2.99;
+  const platformFee = 1.99;
+  const packagingFee = 0.99;
+  const gst = subtotal * 0.05;
+  const grandTotal = subtotal - itemDiscount - couponDiscount + deliveryFee + platformFee + packagingFee + gst + tip;
+
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Handlers
+  const handleUpdateQuantity = (id, newQuantity) => {
+    if (contextUpdateQuantity) {
+      contextUpdateQuantity(id, newQuantity);
+    } else {
+      if (newQuantity <= 0) {
+        handleRemoveItem(id);
+        return;
+      }
+      setCartItems(prev =>
+        prev.map(item =>
+          item.id === id ? { ...item, quantity: newQuantity } : item
+        )
+      );
     }
   };
 
-  if (loading) {
+  const handleRemoveItem = (id) => {
+    if (contextRemoveFromCart) {
+      contextRemoveFromCart(id);
+    } else {
+      setCartItems(prev => prev.filter(item => item.id !== id));
+    }
+  };
+
+  const handleClearCart = () => {
+    if (window.confirm('Are you sure you want to clear your cart?')) {
+      if (contextClearCart) {
+        contextClearCart();
+      } else {
+        setCartItems([]);
+      }
+    }
+  };
+
+  const handleApplyCoupon = (coupon) => {
+    setAppliedCoupon(coupon);
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+  };
+
+  const handleAddToCart = (food) => {
+    if (contextAddToCart) {
+      contextAddToCart(food);
+    } else {
+      const existing = cartItems.find(item => item.id === food.id);
+      if (existing) {
+        handleUpdateQuantity(food.id, existing.quantity + 1);
+      } else {
+        setCartItems(prev => [...prev, { ...food, quantity: 1 }]);
+      }
+    }
+  };
+
+  const handlePlaceOrder = () => {
+    setIsOrderPlacing(true);
+    setTimeout(() => {
+      setIsOrderPlacing(false);
+      navigate('/checkout');
+    }, 2000);
+  };
+
+  // Empty cart state
+  if (items.length === 0) {
     return (
       <MainLayout>
-        <div className="min-h-[70vh] flex items-center justify-center">
-          <div className="text-center">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full border-4 border-gray-200 dark:border-gray-700 animate-spin" />
-              <div className="absolute top-0 left-0 w-20 h-20 rounded-full border-4 border-t-red-500 border-r-orange-500 border-b-purple-500 border-l-transparent animate-spin" style={{ animationDuration: '0.8s' }} />
-            </div>
-            <p className="text-gray-500 dark:text-gray-400 mt-4 font-medium animate-pulse">
-              Loading cart...
-            </p>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+          <div className="container mx-auto px-4 py-12">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center max-w-md mx-auto"
+            >
+              <div className="text-8xl mb-6">🛒</div>
+              <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
+                Your Cart is Empty
+              </h2>
+              <p className="text-gray-500 dark:text-gray-400 mb-6">
+                Looks like you haven't added any items to your cart yet.
+                Explore our delicious menu and order now!
+              </p>
+              <Link to="/restaurants">
+                <button className="px-8 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300">
+                  Browse Restaurants
+                </button>
+              </Link>
+            </motion.div>
           </div>
         </div>
       </MainLayout>
@@ -181,387 +655,224 @@ const Cart = () => {
 
   return (
     <MainLayout>
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8"
-        >
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
-              <FiShoppingBag className="text-orange-500" />
-              Shopping Cart
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
-              {itemCount > 0 
-                ? `${itemCount} items in your cart` 
-                : 'Your cart is empty'}
-            </p>
-          </div>
-          {cartItems.length > 0 && (
-            <button
-              onClick={clearCart}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-300"
-            >
-              <FiTrash2 className="w-4 h-4" />
-              Clear Cart
-            </button>
-          )}
-        </motion.div>
-
-        {cartItems.length === 0 && savedItems.length === 0 ? (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="container mx-auto px-4 py-6 md:py-8">
+          {/* Header */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-card rounded-2xl p-12 text-center"
+            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6"
           >
-            <div className="text-6xl mb-4">🛒</div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-              Your Cart is Empty
-            </h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Looks like you haven't added any items to your cart yet.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
+                <FiShoppingBag className="text-orange-500" />
+                Your Cart
+                <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                  ({totalItems} items)
+                </span>
+              </h1>
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                <span className="flex items-center gap-1">
+                  <FiClock className="text-orange-500" />
+                  Est. Delivery: 25-35 min
+                </span>
+                <span className="flex items-center gap-1">
+                  <FiMapPin className="text-orange-500" />
+                  1.2 km away
+                </span>
+                <span className="flex items-center gap-1">
+                  <FiStar className="text-yellow-400 fill-current" />
+                  4.8 (1245 reviews)
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2">
               <Link to="/restaurants">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-6 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300"
-                >
-                  Browse Restaurants
-                </motion.button>
-              </Link>
-              <Link to="/">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-6 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300"
-                >
-                  Continue Shopping
-                </motion.button>
-              </Link>
-            </div>
-          </motion.div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Cart Items */}
-            <div className="lg:col-span-2 space-y-4">
-              {/* Cart Items List */}
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                className="space-y-4"
-              >
-                {cartItems.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    variants={itemVariants}
-                    className="glass-card rounded-2xl overflow-hidden hover:shadow-3xl transition-all duration-300"
-                  >
-                    <div className="flex flex-col sm:flex-row gap-4 p-4">
-                      {/* Image */}
-                      <div className="sm:w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/30 dark:to-orange-800/30 flex items-center justify-center text-4xl">
-                        {item.image || '🍽️'}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-800 dark:text-white">
-                              {item.name}
-                            </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {item.restaurant || 'Restaurant'}
-                            </p>
-                            {item.isVeg !== undefined && (
-                              <div className="flex items-center gap-1 mt-1">
-                                {item.isVeg ? (
-                                  <span className="text-green-500 flex items-center gap-1 text-xs">
-                                    <FaLeaf /> Veg
-                                  </span>
-                                ) : (
-                                  <span className="text-red-500 flex items-center gap-1 text-xs">
-                                    <FaUtensils /> Non-Veg
-                                  </span>
-                                )}
-                                {item.rating && (
-                                  <span className="flex items-center gap-1 text-xs text-yellow-500">
-                                    <FiStar className="fill-current" /> {item.rating}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-xl font-bold text-orange-500">
-                            ${(item.price * item.quantity).toFixed(2)}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                          {/* Quantity Controls */}
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="p-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 disabled:opacity-50"
-                              disabled={item.quantity <= 1}
-                            >
-                              <FiMinus className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                            </button>
-                            <span className="w-8 text-center font-bold text-gray-800 dark:text-white">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="p-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white hover:scale-105 transition-all duration-300"
-                            >
-                              <FiPlus className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleSaveForLater(item)}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all duration-300 text-sm font-medium"
-                            >
-                              <FiHeart className="w-4 h-4" />
-                              Save
-                            </button>
-                            <button
-                              onClick={() => removeFromCart(item.id)}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-300 text-sm font-medium"
-                            >
-                              <FiTrash2 className="w-4 h-4" />
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-
-              {/* Saved Items */}
-              {savedItems.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                    <FiHeart className="text-purple-500" />
-                    Saved for Later ({savedItems.length})
-                  </h3>
-                  <div className="space-y-3">
-                    {savedItems.map((item) => (
-                      <div key={item.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/30 dark:to-orange-800/30 flex items-center justify-center text-3xl">
-                            {item.image || '🍽️'}
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-800 dark:text-white">{item.name}</h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">${item.price}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleMoveToCart(item)}
-                          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300"
-                        >
-                          Move to Cart
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Order Summary */}
-            <div className="lg:col-span-1">
-              <div className="glass-card rounded-2xl p-6 sticky top-4">
-                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
-                  Order Summary
-                </h3>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-300">Subtotal ({itemCount} items)</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">${subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-300">Delivery Fee</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">
-                      {deliveryFee === 0 ? 'FREE' : `$${deliveryFee.toFixed(2)}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-300">Tax (8%)</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">${tax.toFixed(2)}</span>
-                  </div>
-
-                  {couponApplied && discount > 0 && (
-                    <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
-                      <span className="flex items-center gap-1">
-                        <FiTag className="w-4 h-4" /> Discount
-                      </span>
-                      <span>-${discount.toFixed(2)}</span>
-                    </div>
-                  )}
-
-                  <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex justify-between text-lg font-bold">
-                      <span className="text-gray-800 dark:text-white">Total</span>
-                      <span className="text-orange-500">${total.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Coupon Section */}
-                <div className="mt-4">
-                  {!couponApplied ? (
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value)}
-                          placeholder="Enter coupon code"
-                          className="flex-1 px-4 py-2.5 rounded-xl food-input text-sm"
-                        />
-                        <button
-                          onClick={handleApplyCoupon}
-                          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300"
-                        >
-                          Apply
-                        </button>
-                      </div>
-                      {couponError && (
-                        <p className="text-xs text-red-500 flex items-center gap-1">
-                          <FiAlertCircle className="w-3 h-3" />
-                          {couponError}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Available:</span>
-                        <button
-                          onClick={() => {
-                            setCouponCode('SAVE20');
-                            handleApplyCoupon();
-                          }}
-                          className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          SAVE20
-                        </button>
-                        <button
-                          onClick={() => {
-                            setCouponCode('FIRST10');
-                            handleApplyCoupon();
-                          }}
-                          className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          FIRST10
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30">
-                      <div className="flex items-center gap-2">
-                        <FiCheckCircle className="text-green-500" />
-                        <div>
-                          <p className="text-sm font-semibold text-green-700 dark:text-green-400">
-                            Coupon Applied!
-                          </p>
-                          <p className="text-xs text-green-600 dark:text-green-300">
-                            You saved ${discount.toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleRemoveCoupon}
-                        className="text-green-500 hover:text-green-600 transition-colors"
-                      >
-                        <FiXCircle className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Delivery Info */}
-                <div className="mt-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                    <FiTruckIcon className="text-orange-500" />
-                    <span>{deliveryFee === 0 ? 'Free Delivery' : `Delivery Fee: $${deliveryFee.toFixed(2)}`}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 mt-1">
-                    <FiShield className="text-orange-500" />
-                    <span>Quality Guaranteed</span>
-                  </div>
-                </div>
-
-                {/* Checkout Button */}
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleProceedToCheckout}
-                  disabled={cartItems.length === 0}
-                  className="w-full mt-4 py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold text-base shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <FiCreditCard className="w-5 h-5" />
-                  Proceed to Checkout
-                  <FiArrowRight className="w-5 h-5" />
-                </motion.button>
-
-                <button
-                  onClick={handleContinueShopping}
-                  className="w-full mt-3 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 flex items-center justify-center gap-2"
-                >
-                  <FiArrowLeft className="w-4 h-4" />
+                <button className="px-4 py-2 rounded-xl glass-card hover:shadow-lg transition-all text-sm font-medium text-gray-700 dark:text-gray-300">
                   Continue Shopping
                 </button>
+              </Link>
+              <button
+                onClick={handleClearCart}
+                className="px-4 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-sm font-medium"
+              >
+                Clear Cart
+              </button>
+            </div>
+          </motion.div>
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Cart Items */}
+            <div className="lg:col-span-2 space-y-4">
+              <AnimatePresence mode="popLayout">
+                {items.map((item) => (
+                  <CartItem
+                    key={item.id}
+                    item={item}
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onRemove={handleRemoveItem}
+                    onSaveForLater={() => {}}
+                    onFavorite={() => {}}
+                  />
+                ))}
+              </AnimatePresence>
+
+              {/* Coupon Section */}
+              <CouponSection
+                onApplyCoupon={handleApplyCoupon}
+                onRemoveCoupon={handleRemoveCoupon}
+                appliedCoupon={appliedCoupon}
+              />
+
+              {/* Delivery Address */}
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                  <FiMapPin className="text-orange-500" />
+                  Delivery Address
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {mockAddresses.map((addr) => (
+                    <button
+                      key={addr.id}
+                      onClick={() => setSelectedAddress(addr)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+                        selectedAddress.id === addr.id
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+                      }`}
+                    >
+                      {addr.type === 'Home' ? <FiHome /> : <FiBriefcase />}
+                      {addr.type}
+                    </button>
+                  ))}
+                  <button className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-orange-500 hover:text-orange-500 transition-all">
+                    <FiPlus /> Add New
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
+                  {selectedAddress.address}
+                </p>
+              </div>
+
+              {/* Delivery Options */}
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                  <FiTruck className="text-orange-500" />
+                  Delivery Options
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  <button className="px-6 py-2.5 rounded-xl bg-orange-500 text-white font-semibold shadow-lg shadow-orange-500/30">
+                    Deliver Now
+                  </button>
+                  <button className="px-6 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 transition-colors">
+                    Schedule Delivery
+                  </button>
+                </div>
+              </div>
+
+              {/* Recommended Foods */}
+              <RecommendedFoods foods={mockRecommendedFoods} onAdd={handleAddToCart} />
+
+              {/* Order Instructions */}
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                  <FiInfo className="text-orange-500" />
+                  Order Instructions
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {['Don\'t Ring Bell', 'Call on Arrival', 'Leave at Door', 'Contactless Delivery'].map((instruction) => (
+                    <button
+                      key={instruction}
+                      className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 transition-colors text-sm"
+                    >
+                      {instruction}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Add custom note..."
+                  className="w-full mt-3 px-4 py-2.5 rounded-xl bg-white/60 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Sidebar */}
+            <div className="lg:col-span-1 space-y-4">
+              <BillSummary
+                subtotal={subtotal}
+                discount={itemDiscount}
+                couponDiscount={couponDiscount}
+                deliveryFee={deliveryFee}
+                platformFee={platformFee}
+                packagingFee={packagingFee}
+                gst={gst}
+                tip={tip}
+                grandTotal={grandTotal}
+              />
+
+              {/* Payment Methods Preview */}
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                  <FiCreditCard className="text-orange-500" />
+                  Payment Options
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                    <FiSmartphone /> UPI
+                  </span>
+                  <span className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                    <FiCreditCard /> Cards
+                  </span>
+                  <span className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                    <FiDollarSign /> COD
+                  </span>
+                  <span className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                    <FiZap /> Wallet
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        )}
 
-        {/* Recommended Items */}
-        {cartItems.length > 0 && (
+          {/* Sticky Checkout Footer */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="mt-8"
+            className="fixed bottom-0 left-0 right-0 z-40 glass-card border-t border-gray-200 dark:border-gray-700 px-4 py-3 md:py-4"
           >
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-              <FiTrendingUp className="text-orange-500" />
-              You Might Also Like
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {recommendedItems.map((item) => (
-                <motion.div
-                  key={item.id}
-                  whileHover={{ y: -5 }}
-                  className="glass-card rounded-2xl p-4 text-center hover:shadow-3xl transition-all duration-300"
+            <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Total Items: <span className="font-semibold text-gray-800 dark:text-white">{totalItems}</span>
+                  </p>
+                  <p className="text-2xl font-bold text-orange-500">${grandTotal.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  onClick={handlePlaceOrder}
+                  disabled={isOrderPlacing}
+                  className="flex-1 sm:flex-none px-8 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  <div className="text-4xl mb-2">{item.image}</div>
-                  <h4 className="font-semibold text-gray-800 dark:text-white text-sm">{item.name}</h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{item.restaurant}</p>
-                  <p className="text-sm font-bold text-orange-500 mt-1">${item.price}</p>
-                  <button
-                    onClick={() => {
-                      // Add to cart logic
-                      toast.success('Added to cart!');
-                    }}
-                    className="mt-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all duration-300"
-                  >
-                    Add to Cart
-                  </button>
-                </motion.div>
-              ))}
+                  {isOrderPlacing ? (
+                    <>
+                      <FiLoader className="w-5 h-5 animate-spin" />
+                      Placing Order...
+                    </>
+                  ) : (
+                    <>
+                      Proceed to Checkout
+                      <FiArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </motion.div>
-        )}
+        </div>
       </div>
     </MainLayout>
   );
