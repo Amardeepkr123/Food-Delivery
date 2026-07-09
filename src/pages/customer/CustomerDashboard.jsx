@@ -1,3 +1,4 @@
+// src/pages/customer/CustomerDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
@@ -47,7 +48,11 @@ import {
   FiMoreVertical,
   FiGift,
   FiZap,
-  FiCoffee
+  FiCoffee,
+  FiLock,          // ✅ ADDED - Was missing
+  FiShield,        // ✅ ADDED - For security
+  FiEye,           // ✅ ADDED - For password visibility
+  FiEyeOff,        // ✅ ADDED - For password visibility
 } from 'react-icons/fi';
 import { 
   FaUtensils, 
@@ -62,7 +67,178 @@ import {
 } from 'react-icons/fa';
 import MainLayout from '../../layouts/MainLayout';
 import { useAuth } from '../../hooks/useAuth';
+import { toast } from 'react-hot-toast';
 
+// ============================================
+// SUB-COMPONENTS
+// ============================================
+
+// Stats Card Component
+const StatsCard = ({ icon: Icon, label, value, color, subtitle }) => {
+  return (
+    <motion.div
+      whileHover={{ y: -4 }}
+      className="glass-card rounded-2xl p-5 text-center hover:shadow-3xl transition-all duration-300"
+    >
+      <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${color} flex items-center justify-center text-white text-xl mx-auto mb-3`}>
+        <Icon className="w-6 h-6" />
+      </div>
+      <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+      {subtitle && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{subtitle}</p>}
+    </motion.div>
+  );
+};
+
+// Order Card Component
+const OrderCard = ({ order, onTrack, onReorder, onRate }) => {
+  const StatusIcon = getStatusIcon(order.status);
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors gap-3"
+    >
+      <div className="flex items-start gap-3">
+        <span className="text-3xl">{order.image}</span>
+        <div>
+          <p className="font-semibold text-gray-800 dark:text-white">{order.restaurant}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{order.items}</p>
+          <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+            <span>{order.date}</span>
+            <span>•</span>
+            <span>{order.time}</span>
+            <span>•</span>
+            <span className="font-medium text-gray-600 dark:text-gray-300">${order.total}</span>
+          </div>
+          {order.rating && (
+            <div className="flex items-center gap-1 mt-1">
+              {[...Array(5)].map((_, i) => (
+                <FiStar key={i} className={`w-3 h-3 ${i < order.rating ? 'fill-current text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`} />
+              ))}
+              <span className="text-xs text-gray-500 ml-1">{order.review}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <span className={`text-xs px-3 py-1.5 rounded-full ${getStatusColor(order.status)} font-medium flex items-center gap-1`}>
+          <StatusIcon className="w-3 h-3" />
+          {getStatusText(order.status)}
+        </span>
+        {order.status === 'in_transit' && (
+          <button
+            onClick={() => onTrack(order.id)}
+            className="text-xs px-3 py-1.5 rounded-full bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors"
+          >
+            Track
+          </button>
+        )}
+        {order.status === 'delivered' && (
+          <button
+            onClick={() => onReorder(order.id)}
+            className="text-xs px-3 py-1.5 rounded-full bg-orange-500 text-white font-semibold hover:bg-orange-600 transition-colors"
+          >
+            Reorder
+          </button>
+        )}
+        {order.status === 'delivered' && !order.rating && (
+          <button
+            onClick={() => onRate(order.id)}
+            className="text-xs px-3 py-1.5 rounded-full bg-purple-500 text-white font-semibold hover:bg-purple-600 transition-colors"
+          >
+            Rate
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+// Activity Item Component
+const ActivityItem = ({ activity }) => {
+  const Icon = activity.icon;
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+      <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-500">
+        <Icon className="w-4 h-4" />
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-medium text-gray-800 dark:text-white">{activity.action}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{activity.time}</p>
+      </div>
+    </div>
+  );
+};
+
+// Notification Item Component
+const NotificationItem = ({ notification, onMarkRead }) => {
+  const typeColors = {
+    success: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
+    promo: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
+    info: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+  };
+
+  return (
+    <div className={`flex items-start gap-3 p-3 rounded-xl transition-colors ${!notification.read ? 'bg-orange-50/50 dark:bg-orange-900/10' : 'hover:bg-gray-50/50 dark:hover:bg-gray-800/50'}`}>
+      <div className={`w-8 h-8 rounded-full ${typeColors[notification.type]} flex items-center justify-center flex-shrink-0`}>
+        {notification.type === 'success' && <FiCheckCircle className="w-4 h-4" />}
+        {notification.type === 'promo' && <FiGift className="w-4 h-4" />}
+        {notification.type === 'info' && <FiInfo className="w-4 h-4" />}
+      </div>
+      <div className="flex-1">
+        <p className="text-sm text-gray-800 dark:text-white">{notification.message}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{notification.time}</p>
+      </div>
+      {!notification.read && (
+        <button
+          onClick={() => onMarkRead(notification.id)}
+          className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <FiCheck className="w-4 h-4 text-gray-400" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+const getStatusColor = (status) => {
+  const colors = {
+    delivered: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+    in_transit: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+    preparing: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
+    cancelled: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+  };
+  return colors[status] || colors.preparing;
+};
+
+const getStatusIcon = (status) => {
+  const icons = {
+    delivered: FiCheckCircle,
+    in_transit: FiTruck,
+    preparing: FiClockIcon,
+    cancelled: FiXCircle,
+  };
+  return icons[status] || FiClockIcon;
+};
+
+const getStatusText = (status) => {
+  const texts = {
+    delivered: 'Delivered',
+    in_transit: 'In Transit',
+    preparing: 'Preparing',
+    cancelled: 'Cancelled',
+  };
+  return texts[status] || status;
+};
+
+// ============================================
+// MAIN CUSTOMER DASHBOARD
+// ============================================
 const CustomerDashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -73,11 +249,11 @@ const CustomerDashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         const mockOrders = [
@@ -167,6 +343,7 @@ const CustomerDashboard = () => {
         setNotifications(mockNotifications);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        toast.error('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
@@ -174,36 +351,6 @@ const CustomerDashboard = () => {
 
     fetchDashboardData();
   }, []);
-
-  const getStatusColor = (status) => {
-    const colors = {
-      delivered: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-      in_transit: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-      preparing: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
-      cancelled: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-    };
-    return colors[status] || colors.preparing;
-  };
-
-  const getStatusIcon = (status) => {
-    const icons = {
-      delivered: FiCheckCircle,
-      in_transit: FiTruck,
-      preparing: FiClockIcon,
-      cancelled: FiXCircle
-    };
-    return icons[status] || FiClockIcon;
-  };
-
-  const getStatusText = (status) => {
-    const texts = {
-      delivered: 'Delivered',
-      in_transit: 'In Transit',
-      preparing: 'Preparing',
-      cancelled: 'Cancelled'
-    };
-    return texts[status] || status;
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -220,6 +367,23 @@ const CustomerDashboard = () => {
 
   const handleViewRestaurant = (restaurant) => {
     navigate(`/restaurant/${restaurant.toLowerCase().replace(/\s/g, '-')}`);
+  };
+
+  const handleRateOrder = (orderId) => {
+    toast.success('Rating feature coming soon! ⭐');
+  };
+
+  const handleMarkNotificationRead = (id) => {
+    setNotifications(prev =>
+      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    );
+  };
+
+  const handleMarkAllRead = () => {
+    setNotifications(prev =>
+      prev.map(n => ({ ...n, read: true }))
+    );
+    toast.success('All notifications marked as read');
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -281,6 +445,68 @@ const CustomerDashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Notification Bell */}
+            <div className="relative">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2.5 rounded-xl glass-card hover:shadow-2xl transition-all duration-300 relative"
+              >
+                <FiBell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </motion.button>
+              
+              <AnimatePresence>
+                {showNotifications && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 top-full mt-2 w-80 glass-card rounded-2xl shadow-2xl z-50 max-h-96 overflow-y-auto"
+                  >
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl">
+                      <h4 className="font-semibold text-gray-800 dark:text-white">Notifications</h4>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-xs text-orange-500 hover:text-orange-600 transition-colors"
+                        >
+                          Mark all read
+                        </button>
+                        <button
+                          onClick={() => setShowNotifications(false)}
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                        >
+                          <FiX className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      {notifications.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <FiBell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No notifications</p>
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <NotificationItem
+                            key={notification.id}
+                            notification={notification}
+                            onMarkRead={handleMarkNotificationRead}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -308,24 +534,30 @@ const CustomerDashboard = () => {
           animate="visible"
           className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
         >
-          {[
-            { label: 'Total Orders', value: stats.totalOrders, icon: FiShoppingBag, color: 'from-blue-500 to-cyan-500' },
-            { label: 'Total Spent', value: `$${stats.totalSpent.toFixed(2)}`, icon: FiDollarSign, color: 'from-green-500 to-emerald-500' },
-            { label: 'Favorites', value: stats.favorites, icon: FiHeart, color: 'from-red-500 to-pink-500' },
-            { label: 'Reviews', value: stats.reviews, icon: FiStar, color: 'from-yellow-500 to-yellow-600' },
-          ].map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              variants={itemVariants}
-              className="glass-card rounded-2xl p-4 text-center hover:shadow-3xl transition-all duration-300"
-            >
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${stat.color} flex items-center justify-center text-white text-lg mx-auto mb-2`}>
-                <stat.icon className="w-5 h-5" />
-              </div>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stat.value}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
-            </motion.div>
-          ))}
+          <StatsCard
+            icon={FiShoppingBag}
+            label="Total Orders"
+            value={stats.totalOrders}
+            color="from-blue-500 to-cyan-500"
+          />
+          <StatsCard
+            icon={FiDollarSign}
+            label="Total Spent"
+            value={`$${stats.totalSpent.toFixed(2)}`}
+            color="from-green-500 to-emerald-500"
+          />
+          <StatsCard
+            icon={FiHeart}
+            label="Favorites"
+            value={stats.favorites}
+            color="from-red-500 to-pink-500"
+          />
+          <StatsCard
+            icon={FiStar}
+            label="Reviews"
+            value={stats.reviews}
+            color="from-yellow-500 to-yellow-600"
+          />
         </motion.div>
 
         {/* Loyalty Section */}
@@ -414,27 +646,15 @@ const CustomerDashboard = () => {
                     </button>
                   </div>
                   <div className="space-y-3 max-h-80 overflow-y-auto">
-                    {orders.slice(0, 3).map((order) => {
-                      const StatusIcon = getStatusIcon(order.status);
-                      return (
-                        <div key={order.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{order.image}</span>
-                            <div>
-                              <p className="font-semibold text-gray-800 dark:text-white">{order.restaurant}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{order.id}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-gray-800 dark:text-white">${order.total}</p>
-                            <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.status)} flex items-center gap-1`}>
-                              <StatusIcon className="w-3 h-3" />
-                              {getStatusText(order.status)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {orders.slice(0, 3).map((order) => (
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        onTrack={handleTrackOrder}
+                        onReorder={handleRepeatOrder}
+                        onRate={handleRateOrder}
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -445,20 +665,9 @@ const CustomerDashboard = () => {
                     Recent Activity
                   </h3>
                   <div className="space-y-3">
-                    {recentActivity.map((activity, index) => {
-                      const Icon = activity.icon;
-                      return (
-                        <div key={index} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                          <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-500">
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-800 dark:text-white">{activity.action}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{activity.time}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {recentActivity.map((activity, index) => (
+                      <ActivityItem key={index} activity={activity} />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -484,67 +693,15 @@ const CustomerDashboard = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  {orders.map((order) => {
-                    const StatusIcon = getStatusIcon(order.status);
-                    return (
-                      <motion.div
-                        key={order.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors gap-3"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="text-3xl">{order.image}</span>
-                          <div>
-                            <p className="font-semibold text-gray-800 dark:text-white">{order.restaurant}</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">{order.items}</p>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                              <span>{order.date}</span>
-                              <span>•</span>
-                              <span>{order.time}</span>
-                              <span>•</span>
-                              <span className="font-medium text-gray-600 dark:text-gray-300">${order.total}</span>
-                            </div>
-                            {order.rating && (
-                              <div className="flex items-center gap-1 mt-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <FiStar key={i} className={`w-3 h-3 ${i < order.rating ? 'fill-current text-yellow-400' : 'text-gray-300'}`} />
-                                ))}
-                                <span className="text-xs text-gray-500 ml-1">{order.review}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                          <span className={`text-xs px-3 py-1.5 rounded-full ${getStatusColor(order.status)} font-medium flex items-center gap-1`}>
-                            <StatusIcon className="w-3 h-3" />
-                            {getStatusText(order.status)}
-                          </span>
-                          {order.status === 'in_transit' && (
-                            <button
-                              onClick={() => handleTrackOrder(order.id)}
-                              className="text-xs px-3 py-1.5 rounded-full bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors"
-                            >
-                              Track
-                            </button>
-                          )}
-                          {order.status === 'delivered' && (
-                            <button
-                              onClick={() => handleRepeatOrder(order.id)}
-                              className="text-xs px-3 py-1.5 rounded-full bg-orange-500 text-white font-semibold hover:bg-orange-600 transition-colors"
-                            >
-                              Reorder
-                            </button>
-                          )}
-                          {order.status === 'delivered' && !order.rating && (
-                            <button className="text-xs px-3 py-1.5 rounded-full bg-purple-500 text-white font-semibold hover:bg-purple-600 transition-colors">
-                              Rate
-                            </button>
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                  {orders.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      onTrack={handleTrackOrder}
+                      onReorder={handleRepeatOrder}
+                      onRate={handleRateOrder}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -690,6 +847,13 @@ const CustomerDashboard = () => {
                       <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
                         <FiLock className="text-orange-500" />
                         Change Password
+                      </span>
+                      <FiChevronRight className="text-gray-400" />
+                    </button>
+                    <button className="w-full flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+                      <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <FiShield className="text-orange-500" />
+                        Security Settings
                       </span>
                       <FiChevronRight className="text-gray-400" />
                     </button>
