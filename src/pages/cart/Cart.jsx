@@ -38,6 +38,7 @@ import {
   FiLoader,
   FiPackage,
   FiSend,
+  FiXCircle,
 } from 'react-icons/fi';
 import { FaLeaf, FaUtensils } from 'react-icons/fa';
 
@@ -115,8 +116,8 @@ const mockRecommendedFoods = [
 
 const mockCoupons = [
   { code: 'FIRST20', description: '20% off on first order', discount: 20, minOrder: 50 },
-  { code: 'FREEDEL', description: 'Free delivery on orders above ₹300', discount: 0, minOrder: 30 },
-  { code: 'SAVE50', description: '₹50 off on orders above ₹200', discount: 50, minOrder: 20 },
+  { code: 'FREEDEL', description: 'Free delivery on orders above $30', discount: 0, minOrder: 30 },
+  { code: 'SAVE50', description: '$50 off on orders above $200', discount: 50, minOrder: 20 },
 ];
 
 const mockAddresses = [
@@ -529,8 +530,8 @@ const Cart = () => {
     removeFromCart: contextRemoveFromCart,
     updateQuantity: contextUpdateQuantity,
     clearCart: contextClearCart,
-    getSubtotal,
-    getTotal,
+    getSubtotal: contextGetSubtotal,
+    getTotal: contextGetTotal,
     itemCount: contextItemCount,
   } = useCartContext();
 

@@ -76,7 +76,7 @@ import Earnings from '../pages/deliveryPartner/Earnings';
 import LiveDelivery from '../pages/deliveryPartner/LiveDelivery';
 
 // ============================================
-// ADMIN PAGES - ✅ FIXED: Lowercase 'admin'
+// ADMIN PAGES
 // ============================================
 import AdminDashboard from '../pages/admin/Dashboard';
 import AdminUsers from '../pages/admin/Users';
@@ -97,6 +97,13 @@ import CancelOrder from '../pages/orders/CancelOrder';
 import Refund from '../pages/orders/Refund';
 import ReviewOrder from '../pages/orders/ReviewOrder';
 import Invoice from '../pages/orders/Invoice';
+
+// ============================================
+// PAYMENT PAGES - ✅ FIXED: Proper imports
+// ============================================
+import Payment from '../pages/payment/Payment';
+import PaymentSuccess from '../pages/payment/PaymentSuccess';
+import PaymentFailed from '../pages/payment/PaymentFailed';
 
 // ============================================
 // ERROR PAGES
@@ -165,6 +172,13 @@ const AppRoutes = () => {
         <Route path="/orders/refund/:id" element={<Refund />} />
         <Route path="/orders/review/:id" element={<ReviewOrder />} />
         <Route path="/invoice/:id" element={<Invoice />} />
+
+        {/* ==========================================
+            PAYMENT ROUTES - ✅ FIXED: Proper JSX syntax
+            ========================================== */}
+        <Route path="/payment" element={<Payment />} />
+        <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment/failed" element={<PaymentFailed />} />
 
         {/* ==========================================
             RESTAURANT OWNER ROUTES

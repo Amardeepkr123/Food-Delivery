@@ -1,89 +1,233 @@
 // src/layouts/DashboardLayout.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   FiHome,
-  FiUsers,
-  FiShoppingBag,
   FiPackage,
+  FiUsers,
   FiTruck,
   FiDollarSign,
-  FiStar,
-  FiAward,
-  FiBarChart2,
-  FiFileText,
-  FiBell,
   FiSettings,
-  FiUser,
   FiLogOut,
   FiMenu,
   FiX,
-  FiChevronDown,
-  FiChevronRight,
+  FiBell,
+  FiUser,
   FiGrid,
-  FiClock,
-  FiMapPin,
-  FiMessageCircle,
-  FiTrendingUp,
-  FiZap,
-  FiShield,
-  FiHelpCircle,
-  FiMail,
+  FiBarChart2,
   FiCalendar,
-  FiFlag,
   FiTag,
-  FiGift,
-  FiHeart,
-  FiShare2,
-  FiMoreHorizontal,
+  FiStar,
+  FiFileText,
 } from 'react-icons/fi';
-import { FaUtensils, FaStore, FaMotorcycle, FaCrown } from 'react-icons/fa';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthContext } from '../context/AuthContext';
 import { useNotificationContext } from '../context/NotificationContext';
 import ThemeToggle from '../components/common/ThemeToggle';
-import NotificationDropdown from '../components/common/NotificationDropdown';
-import UserMenu from '../components/common/UserMenu';
+import { toast } from 'react-toastify';
+
+// ============================================
+// NOTIFICATION DROPDOWN COMPONENT
+// ============================================
+const NotificationDropdown = () => {
+  const { notifications, unreadCount, markAsRead } = useNotificationContext();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleDropdown = () => setIsOpen(!isOpen);
+
+  const handleMarkAsRead = (id) => {
+    markAsRead(id);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={toggleDropdown}
+        className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      >
+        <FiBell className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-800 dark:text-white">Notifications</h3>
+            {unreadCount > 0 && (
+              <button
+                onClick={() => {
+                  notifications.forEach(n => !n.read && handleMarkAsRead(n.id));
+                }}
+                className="text-xs text-orange-500 hover:text-orange-600"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-96 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                No notifications
+              </div>
+            ) : (
+              notifications.slice(0, 10).map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                    !notification.read ? 'bg-orange-50 dark:bg-orange-900/10' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-800 dark:text-white">
+                        {notification.title}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(notification.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {!notification.read && (
+                      <button
+                        onClick={() => handleMarkAsRead(notification.id)}
+                        className="text-xs text-orange-500 hover:text-orange-600"
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+            <Link
+              to="/admin/notifications"
+              className="block text-center text-sm text-orange-500 hover:text-orange-600"
+            >
+              View all notifications
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// USER MENU COMPONENT
+// ============================================
+const UserMenu = () => {
+  const { user, logout } = useAuthContext();
+  const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleDropdown = () => setIsOpen(!isOpen);
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Logged out successfully');
+    navigate('/login');
+  };
+
+  const menuItems = [
+    { label: 'Profile', icon: FiUser, path: '/profile' },
+    { label: 'My Orders', icon: FiPackage, path: '/my-orders' },
+    { label: 'Settings', icon: FiSettings, path: '/settings' },
+  ];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={toggleDropdown}
+        className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      >
+        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center text-white font-semibold">
+          {user?.name?.charAt(0) || 'U'}
+        </div>
+        <span className="hidden md:block text-sm text-gray-700 dark:text-gray-300">
+          {user?.name || 'User'}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+            <p className="font-semibold text-gray-800 dark:text-white">{user?.name || 'User'}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
+          </div>
+          <div className="py-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.label}
+                  to={item.path}
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Icon className="w-4 h-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <FiLogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ============================================
 // SIDEBAR MENU ITEMS
 // ============================================
 const getMenuItems = (role) => {
   const baseItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: FiGrid },
-    { path: '/orders', label: 'Orders', icon: FiPackage },
-    { path: '/restaurants', label: 'Restaurants', icon: FaStore },
-    { path: '/profile', label: 'Profile', icon: FiUser },
+    { label: 'Dashboard', icon: FiGrid, path: '/dashboard', roles: ['admin', 'restaurant_owner', 'delivery_partner'] },
   ];
 
   const roleSpecificItems = {
     admin: [
-      { path: '/admin/users', label: 'Users', icon: FiUsers },
-      { path: '/admin/restaurants', label: 'Restaurants', icon: FaStore },
-      { path: '/admin/delivery-partners', label: 'Delivery Partners', icon: FiTruck },
-      { path: '/admin/analytics', label: 'Analytics', icon: FiBarChart2 },
-      { path: '/admin/reports', label: 'Reports', icon: FiFileText },
-      { path: '/admin/settings', label: 'Settings', icon: FiSettings },
+      { label: 'Orders', icon: FiPackage, path: '/admin/orders' },
+      { label: 'Restaurants', icon: FiGrid, path: '/admin/restaurants' },
+      { label: 'Users', icon: FiUsers, path: '/admin/users' },
+      { label: 'Delivery Partners', icon: FiTruck, path: '/admin/delivery-partners' },
+      { label: 'Bookings', icon: FiCalendar, path: '/admin/bookings' },
+      { label: 'Payments', icon: FiDollarSign, path: '/admin/payments' },
+      { label: 'Coupons', icon: FiTag, path: '/admin/coupons' },
+      { label: 'Reviews', icon: FiStar, path: '/admin/reviews' },
+      { label: 'Reports', icon: FiFileText, path: '/admin/reports' },
+      { label: 'Analytics', icon: FiBarChart2, path: '/admin/analytics' },
+      { label: 'Settings', icon: FiSettings, path: '/admin/settings' },
     ],
     restaurant_owner: [
-      { path: '/restaurant-owner/dashboard', label: 'Dashboard', icon: FiGrid },
-      { path: '/restaurant-owner/menu', label: 'Menu Management', icon: FaUtensils },
-      { path: '/restaurant-owner/orders', label: 'Orders', icon: FiPackage },
-      { path: '/restaurant-owner/reservations', label: 'Reservations', icon: FiCalendar },
-      { path: '/restaurant-owner/analytics', label: 'Analytics', icon: FiBarChart2 },
+      { label: 'Menu', icon: FiGrid, path: '/restaurant-owner/menu' },
+      { label: 'Orders', icon: FiPackage, path: '/restaurant-owner/orders' },
+      { label: 'Reservations', icon: FiCalendar, path: '/restaurant-owner/reservations' },
+      { label: 'Analytics', icon: FiBarChart2, path: '/restaurant-owner/analytics' },
     ],
     delivery_partner: [
-      { path: '/delivery/dashboard', label: 'Dashboard', icon: FiGrid },
-      { path: '/delivery/orders', label: 'Available Orders', icon: FiPackage },
-      { path: '/delivery/earnings', label: 'Earnings', icon: FiDollarSign },
-      { path: '/delivery/live', label: 'Live Tracking', icon: FiMapPin },
+      { label: 'Available Orders', icon: FiPackage, path: '/delivery/available' },
+      { label: 'Accepted Orders', icon: FiTruck, path: '/delivery/accepted' },
+      { label: 'Live Delivery', icon: FiGrid, path: '/delivery/live' },
+      { label: 'Earnings', icon: FiDollarSign, path: '/delivery/earnings' },
     ],
     customer: [
-      { path: '/customer/dashboard', label: 'Dashboard', icon: FiGrid },
-      { path: '/orders', label: 'My Orders', icon: FiPackage },
-      { path: '/bookings', label: 'My Bookings', icon: FiCalendar },
-      { path: '/favorites', label: 'Favorites', icon: FiHeart },
-      { path: '/reviews', label: 'My Reviews', icon: FiStar },
+      { label: 'My Orders', icon: FiPackage, path: '/my-orders' },
+      { label: 'Favorites', icon: FiStar, path: '/favorites' },
     ],
   };
 
@@ -91,284 +235,98 @@ const getMenuItems = (role) => {
 };
 
 // ============================================
-// SIDEBAR COMPONENT
-// ============================================
-const Sidebar = ({ isOpen, onToggle, menuItems, activePath, role }) => {
-  const navigate = useNavigate();
-
-  return (
-    <motion.aside
-      initial={{ x: -280 }}
-      animate={{ x: isOpen ? 0 : -280 }}
-      transition={{ type: 'spring', damping: 20 }}
-      className={`fixed top-0 left-0 h-full w-[280px] bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-800/50 z-50 overflow-y-auto`}
-    >
-      {/* Logo */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="text-2xl">🍽️</span>
-          <span className="text-xl font-bold food-gradient-text">FoodDelivery</span>
-        </Link>
-        <button
-          onClick={onToggle}
-          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors lg:hidden"
-        >
-          <FiX className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* User Info */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center text-white font-bold">
-            {role?.charAt(0) || 'U'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-800 dark:text-white truncate">
-              {role === 'admin' ? 'Admin User' : role === 'restaurant_owner' ? 'Restaurant Owner' : role === 'delivery_partner' ? 'Delivery Partner' : 'Customer'}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{role || 'user'}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Menu */}
-      <nav className="p-4 space-y-1">
-        {menuItems.map((item) => {
-          const isActive = activePath === item.path || activePath.startsWith(item.path + '/');
-          return (
-            <motion.button
-              key={item.path}
-              whileHover={{ x: 4 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                navigate(item.path);
-                if (window.innerWidth < 1024) onToggle();
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 ${
-                isActive
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium text-sm">{item.label}</span>
-              {isActive && (
-                <motion.div
-                  layoutId="activeIndicator"
-                  className="ml-auto w-1.5 h-1.5 rounded-full bg-white"
-                />
-              )}
-            </motion.button>
-          );
-        })}
-      </nav>
-
-      {/* Bottom Section */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800">
-        <button
-          onClick={() => {
-            // Logout logic
-            navigate('/login');
-          }}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300"
-        >
-          <FiLogOut className="w-5 h-5" />
-          <span className="font-medium text-sm">Logout</span>
-        </button>
-      </div>
-    </motion.aside>
-  );
-};
-
-// ============================================
-// HEADER COMPONENT
-// ============================================
-const Header = ({ onMenuToggle, user, role }) => {
-  const location = useLocation();
-  const { unreadCount } = useNotificationContext();
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-
-  // Get page title from path
-  const getPageTitle = () => {
-    const path = location.pathname;
-    const titles = {
-      '/dashboard': 'Dashboard',
-      '/admin/users': 'Users',
-      '/admin/restaurants': 'Restaurants',
-      '/admin/delivery-partners': 'Delivery Partners',
-      '/admin/analytics': 'Analytics',
-      '/admin/reports': 'Reports',
-      '/admin/settings': 'Settings',
-      '/restaurant-owner/dashboard': 'Restaurant Dashboard',
-      '/restaurant-owner/menu': 'Menu Management',
-      '/restaurant-owner/orders': 'Orders',
-      '/restaurant-owner/reservations': 'Reservations',
-      '/restaurant-owner/analytics': 'Analytics',
-      '/delivery/dashboard': 'Delivery Dashboard',
-      '/delivery/orders': 'Available Orders',
-      '/delivery/earnings': 'Earnings',
-      '/delivery/live': 'Live Tracking',
-      '/customer/dashboard': 'Customer Dashboard',
-      '/orders': 'My Orders',
-      '/bookings': 'My Bookings',
-      '/favorites': 'Favorites',
-      '/reviews': 'My Reviews',
-      '/profile': 'Profile',
-    };
-    return titles[path] || 'Dashboard';
-  };
-
-  return (
-    <header className="sticky top-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50">
-      <div className="flex items-center justify-between h-16 px-4 md:px-6">
-        {/* Left */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onMenuToggle}
-            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors lg:hidden"
-          >
-            <FiMenu className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold text-gray-800 dark:text-white">
-              {getPageTitle()}
-            </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
-              {role ? `${role.charAt(0).toUpperCase() + role.slice(1)} Panel` : 'Dashboard'}
-            </p>
-          </div>
-        </div>
-
-        {/* Right */}
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <button className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-            <FiSearch className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-          </button>
-
-          {/* Notifications */}
-          <div className="relative">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
-            >
-              <FiBell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-            <NotificationDropdown
-              isOpen={showNotifications}
-              onClose={() => setShowNotifications(false)}
-            />
-          </div>
-
-          {/* Theme Toggle */}
-          <ThemeToggle />
-
-          {/* User Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-sm">
-                {role?.charAt(0) || 'U'}
-              </div>
-              <FiChevronDown className="w-4 h-4 text-gray-500" />
-            </button>
-            <UserMenu
-              isOpen={showUserMenu}
-              onClose={() => setShowUserMenu(false)}
-              user={user}
-              role={role}
-            />
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-};
-
-// ============================================
-// MAIN DASHBOARD LAYOUT
+// DASHBOARD LAYOUT
 // ============================================
 const DashboardLayout = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user } = useAuthContext();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const role = user?.role || 'customer';
-  const menuItems = getMenuItems(role);
+  const menuItems = getMenuItems(user?.role || 'customer');
 
-  // Handle responsive
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 1024;
-      setIsMobile(mobile);
-      if (!mobile) setSidebarOpen(true);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isActive = (path) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
 
-  // Toggle sidebar
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  // Close sidebar on mobile when navigating
-  useEffect(() => {
-    if (isMobile) setSidebarOpen(false);
-  }, [location.pathname, isMobile]);
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white dark:bg-gray-800 shadow-lg"
+      >
+        {mobileMenuOpen ? <FiX className="w-6 h-6" /> : <FiMenu className="w-6 h-6" />}
+      </button>
+
       {/* Sidebar */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={toggleSidebar}
-        menuItems={menuItems}
-        activePath={location.pathname}
-        role={role}
-      />
-
-      {/* Overlay */}
-      {isMobile && sidebarOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={toggleSidebar}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-        />
-      )}
-
-      {/* Main Content */}
-      <div
-        className={`transition-all duration-300 ${
-          sidebarOpen && !isMobile ? 'ml-[280px]' : 'ml-0'
+      <aside
+        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-gray-800 shadow-lg z-40 transition-transform duration-300 ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <Header
-          onMenuToggle={toggleSidebar}
-          user={user}
-          role={role}
-        />
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+              FoodDelivery
+            </span>
+          </Link>
+        </div>
 
+        <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100vh-80px)]">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={item.label}
+                to={item.path}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                  active
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <div className={`lg:ml-64 transition-all duration-300`}>
+        {/* Header */}
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 sticky top-0 z-30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={toggleSidebar}
+                className="hidden lg:block p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                {sidebarOpen ? <FiX className="w-5 h-5" /> : <FiMenu className="w-5 h-5" />}
+              </button>
+              <h1 className="text-xl font-bold text-gray-800 dark:text-white">
+                {menuItems.find(item => isActive(item.path))?.label || 'Dashboard'}
+              </h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              <NotificationDropdown />
+              <UserMenu />
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content */}
         <main className="p-4 md:p-6">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {children}
-          </motion.div>
+          {children}
         </main>
       </div>
     </div>
